@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AI Exam — Choose Role</title>
+  <style>
+    :root{
+      --primary:#2a5298;
+      --bg:#f4f7fa;
+      --card:#fff;
+      --accent:#7c3aed;
+    }
+    body{
+      background:var(--bg);
+      font-family:Segoe UI,Arial,sans-serif;
+      margin:0;
+      padding:0;
+    }
+    header{
+      background:var(--primary);
+      color:#fff;
+      padding:16px;
+      text-align:center;
+      font-weight:700;
+      font-size:1.1rem;
+    }
+    .wrap{
+      max-width:900px;
+      margin:60px auto;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      gap:32px;
+    }
+    h1{
+      font-size:1.6rem;
+      color:#222;
+      margin:0;
+    }
+    .cards{
+      display:flex;
+      gap:32px;
+      flex-wrap:wrap;
+      justify-content:center;
+    }
+    .role-card{
+      background:var(--card);
+      border-radius:16px;
+      box-shadow:0 8px 30px rgba(0,0,0,0.08);
+      padding:28px 32px;
+      width:230px;
+      text-align:center;
+      cursor:pointer;
+      text-decoration:none;
+      color:#222;
+      transition:transform .15s ease, box-shadow .15s ease;
+    }
+    .role-card:hover{
+      transform:translateY(-4px);
+      box-shadow:0 14px 40px rgba(0,0,0,0.12);
+    }
+    .role-icon{
+      font-size:40px;
+      margin-bottom:10px;
+    }
+    .role-title{
+      font-size:1.2rem;
+      font-weight:600;
+      margin-bottom:6px;
+    }
+    .role-desc{
+      font-size:0.9rem;
+      color:#555;
+    }
+    .note{
+      font-size:0.9rem;
+      color:#666;
+      text-align:center;
+      max-width:520px;
+    }
+  </style>
+</head>
+<body>
+<header>AI Virtual Exam Scribe</header>
+
+<div class="wrap">
+  <h1>Log in as</h1>
+
+  <div class="cards">
+    <!-- Student card -->
+    <a href="{{ url_for('exam') }}" class="role-card">
+      <div class="role-icon">🧑‍🎓</div>
+      <div class="role-title">Student</div>
+      <div class="role-desc">
+        Take the voice-controlled exam.<br>
+        Face verification + hands-free answering.
+      </div>
+    </a>
+
+    <!-- Teacher/Admin card -->
+    <a href="{{ url_for('admin_login') }}" class="role-card">
+      <div class="role-icon">👩‍🏫</div>
+      <div class="role-title">Teacher / Admin</div>
+      <div class="role-desc">
+        Log in to register students<br>
+        and review submitted exams.
+      </div>
+    </a>
+  </div>
+
+  <p class="note">
+    Students will be asked for face verification before starting the exam.
+    Teachers can log in with their admin credentials to manage students and view submissions.
+  </p>
+</div>
+</body>
+</html>

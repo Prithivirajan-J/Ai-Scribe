@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Submissions</title>
+  <style>
+    :root{--primary:#2a5298;--bg:#f4f7fa;--card:#fff}
+    body{background:var(--bg);font-family:Segoe UI,Arial,sans-serif;margin:0;}
+    header{
+      background:var(--primary);
+      color:#fff;
+      padding:14px 20px;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      font-weight:600;
+    }
+    header a{color:#fff;text-decoration:none;font-size:0.9rem;}
+    .container{
+      max-width:900px;
+      margin:24px auto;
+      padding:0 16px 32px;
+    }
+    .card{
+      background:var(--card);
+      border-radius:12px;
+      padding:18px 20px;
+      box-shadow:0 6px 24px rgba(0,0,0,0.06);
+    }
+    table{width:100%;border-collapse:collapse;font-size:0.9rem;}
+    th,td{padding:8px 10px;border-bottom:1px solid #eee;text-align:left;}
+    th{background:#f4f7ff;}
+    a.view-link{text-decoration:none;color:var(--primary);font-size:0.85rem;}
+  </style>
+</head>
+<body>
+<header>
+  <div>Exam Submissions</div>
+  <a href="{{ url_for('admin_dashboard') }}">← Back to Dashboard</a>
+</header>
+
+<div class="container">
+  <div class="card">
+    {% if submissions %}
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Student</th>
+            <th>Reg No</th>
+            <th>Time</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for s in submissions %}
+          <tr>
+            <td>{{ s.id }}</td>
+            <td>{{ s.student.name if s.student else "Unknown" }}</td>
+            <td>{{ s.student.reg_no if s.student else "-" }}</td>
+            <td>{{ s.timestamp }}</td>
+            <td><a class="view-link" href="{{ url_for('admin_view_submission', submission_id=s.id) }}">View</a></td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p>No submissions yet.</p>
+    {% endif %}
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Admin Dashboard</title>
+  <style>
+    :root{--primary:#2a5298;--bg:#f4f7fa;--card:#fff}
+    body{background:var(--bg);font-family:Segoe UI,Arial,sans-serif;margin:0;}
+    header{
+      background:var(--primary);
+      color:#fff;
+      padding:14px 20px;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      font-weight:600;
+    }
+    header a{
+      color:#fff;
+      text-decoration:none;
+      font-size:0.9rem;
+      padding:6px 12px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,0.7);
+    }
+    .container{
+      max-width:1000px;
+      margin:24px auto;
+      padding:0 16px 32px;
+    }
+    h2{margin-top:0;}
+    .card{
+      background:var(--card);
+      border-radius:12px;
+      padding:18px 20px;
+      box-shadow:0 6px 24px rgba(0,0,0,0.06);
+      margin-bottom:20px;
+    }
+    table{
+      width:100%;
+      border-collapse:collapse;
+      font-size:0.9rem;
+    }
+    th,td{
+      padding:8px 10px;
+      border-bottom:1px solid #eee;
+      text-align:left;
+    }
+    th{background:#f4f7ff;}
+    .actions a{
+      text-decoration:none;
+      font-size:0.85rem;
+      margin-right:10px;
+      color:var(--primary);
+    }
+    .btn{
+      display:inline-block;
+      padding:8px 14px;
+      border-radius:999px;
+      background:var(--primary);
+      color:#fff;
+      text-decoration:none;
+      font-size:0.9rem;
+      margin-right:8px;
+    }
+  </style>
+</head>
+<body>
+<header>
+  <div>Teacher Dashboard</div>
+  <div>
+    <a href="{{ url_for('role_select') }}">Home</a>
+    <a href="{{ url_for('admin_logout') }}">Logout</a>
+  </div>
+</header>
+
+<div class="container">
+
+  <div class="card">
+    <h2>Students</h2>
+    <a class="btn" href="{{ url_for('admin_add_student') }}">+ Add Student</a>
+
+    {% if students %}
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Reg. No</th>
+            <th>Face Image Path</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for s in students %}
+          <tr>
+            <td>{{ s.id }}</td>
+            <td>{{ s.name }}</td>
+            <td>{{ s.reg_no }}</td>
+            <td>{{ s.face_image }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p>No students registered yet.</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>Submissions</h2>
+    <a class="btn" href="{{ url_for('admin_submissions') }}">View all submissions</a>
+  </div>
+
+</div>
+</body>
+</html>

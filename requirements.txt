@@ -1,0 +1,8 @@
+Flask==2.2.5
+openai-whisper==20240930
+torch==2.5.1
+numpy==1.26.4
+tqdm==4.67.1
+pyaudio==0.2.14
+SpeechRecognition==3.10.0
+flask_sqlalchemy

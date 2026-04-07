@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Voice-First Accessible Exam</title>
+<style>
+:root{--primary:#2a5298;--bg:#f4f7fa;--card:#fff}
+body{background:var(--bg);font-family:Segoe UI,Arial,sans-serif;margin:0;padding:0}
+header{background:var(--primary);color:#fff;padding:14px;text-align:center;font-weight:700}
+.container{max-width:820px;margin:28px auto;background:var(--card);padding:26px;border-radius:12px;box-shadow:0 6px 30px rgba(0,0,0,0.06)}
+.question-label{font-size:1.15rem;margin-bottom:10px;color:#222}
+.options label{display:block;padding:10px;border-radius:8px;margin-bottom:8px;background:#f2f6fb;cursor:pointer;transition:background .2s}
+.options label:hover{background:#e7effb}
+.options input{margin-right:10px}
+#timer{font-weight:700;color:#f4a400;text-align:right}
+#progress-container{background:#e6eefc;border-radius:999px;height:10px;overflow:hidden;margin:10px 0}
+#progress-bar{height:10px;background:linear-gradient(90deg,#2a5298,#f4a400);width:0%}
+#popup{display:none;position:fixed;right:22px;bottom:22px;background:#2a5298;color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,0.12)}
+.note{font-size:0.95rem;color:#555;margin-top:8px}
+.small{font-size:0.9rem;color:#666}
+textarea{width:100%;min-height:100px;border-radius:8px;padding:8px;border:1px solid #ccc;resize:vertical;}
+.student-badge{
+  position:fixed;
+  top:72px;
+  right:30px;
+  background:#fff;
+  border-radius:999px;
+  padding:6px 12px 6px 6px;
+  box-shadow:0 4px 20px rgba(0,0,0,0.08);
+  display:none;
+  align-items:center;
+  gap:8px;
+  z-index:999;
+}
+.student-badge img{
+  width:36px;
+  height:36px;
+  border-radius:50%;
+  object-fit:cover;
+  border:2px solid var(--primary);
+}
+.student-badge .meta{
+  font-size:0.85rem;
+  line-height:1.1;
+}
+.student-badge .meta .name{
+  font-weight:600;
+  color:#222;
+}
+.student-badge .meta .reg{
+  color:#666;
+}
+
+</style>
+</head>
+<body>
+<header style="display:flex;justify-content:space-between;align-items:center;">
+
+  <!-- Left: title -->
+  <span id="exam-header-title">
+    Accessible Voice Exam — Say "Start" to begin
+  </span>
+
+  <!-- Right: student badge -->
+  <div id="student-badge"
+       style="
+         display:none;
+         flex-direction:column;
+         justify-content:center;
+         align-items:flex-start;
+         background:#ffffff;
+         color:#000;
+         padding:6px 14px;
+         border-radius:14px;
+         box-shadow:0 2px 8px rgba(0,0,0,0.15);
+         font-size:14px;
+         font-family:Segoe UI, Arial, sans-serif;
+         line-height:1.4;
+       ">
+
+    <div id="student-badge-name" style="font-weight:500;">
+      Name: ---
+    </div>
+
+    <div id="student-badge-reg" style="font-weight:500;">
+      Reg No: ---
+    </div>
+
+  </div>
+
+</header>
+
+
+
+<div class="container">
+  <div id="timer" class="small"></div>
+  <div id="progress-container"><div id="progress-bar"></div></div>
+  <h2 id="section-title">Waiting to start...</h2>
+  <div id="question-container" class="question-area small">
+    <p class="note">This exam is voice-controlled. Say <strong>start</strong> to begin, then answer using "Option A", "A", or say the option text (e.g., "Paris"). Say <strong>previous</strong> to go back or <strong>submit</strong> to finish.</p>
+  </div>
+  <div class="note">Microphone must be allowed in your browser. Use Chrome for best results.</div>
+</div>
+<div id="popup"></div>
+<div id="student-badge" class="student-badge">
+  <img id="student-photo" src="" alt="Student photo">
+  <div class="meta">
+    <div class="name" id="student-name"></div>
+    <div class="reg" id="student-reg"></div>
+  </div>
+</div>
+
+
+<script>
+let questions = {mcq:[], qa:[]};
+let currentSection = 'mcq';
+let currentIndex = 0;
+let isStarted = false;
+let isAwaitingNext = false;
+let recordingLocked = false;
+let totalTime = 300; // 5 minutes total
+let timeLeft = totalTime;
+let globalTimer = null;
+let faceVerified = false;
+
+
+// ======== FACE VERIFICATION FIRST ========
+async function verifyFace() {
+  return new Promise((resolve, reject) => {
+    navigator.mediaDevices.getUserMedia({ video: true })
+      .then(stream => {
+        const video = document.createElement('video');
+        video.srcObject = stream;
+        video.play();
+
+        showPopup("📸 Capturing your face...");
+        setTimeout(() => {
+          const canvas = document.createElement('canvas');
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const imgData = canvas.toDataURL('image/jpeg');
+
+          fetch('/verify_face', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image: imgData })
+          })
+            .then(res => res.json())
+            .then(data => {
+              stream.getTracks().forEach(t => t.stop());
+
+              if (data.verified) {
+                // ✅ mark as verified once
+                faceVerified = true;
+
+                // ✅ update badge text
+                document.getElementById("student-badge-name").innerText =
+                  "Name: " + (data.name || "Unknown");
+                document.getElementById("student-badge-reg").innerText =
+                  "Reg No: " + (data.reg_no || "—");
+                document.getElementById("student-badge").style.display = "flex";
+
+                // optional: change header title
+                const titleEl = document.getElementById("exam-header-title");
+                if (titleEl) titleEl.textContent = "Accessible Voice Exam";
+
+                showPopup("✅ Face verified successfully!");
+                setTimeout(hidePopup, 1200);
+
+                resolve(true);   // 🔴 important
+              } else {
+                showPopup("❌ " + data.message);
+                setTimeout(hidePopup, 1500);
+                resolve(false);  // ❗ not reject – let caller decide to retry
+              }
+            })
+            .catch(err => {
+              stream.getTracks().forEach(t => t.stop());
+              reject(err);
+            });
+        }, 2000);
+      })
+      .catch(err => {
+        showPopup("Camera access denied!");
+        setTimeout(hidePopup, 1500);
+        reject(err);
+      });
+  });
+}
+
+
+/* ====== Fetch questions ====== */
+fetch('/questions')
+  .then(r => r.json())
+  .then(data => { questions = data; setIdleUI(); startWakeLoop(); })
+  .catch(e => { showPopup("Failed to load questions"); console.error(e); });
+
+function setIdleUI(){
+  document.getElementById('section-title').textContent = "Say 'start' to begin the exam";
+  document.getElementById('question-container').innerHTML = `<p class="small">When you're ready, say <strong>start</strong>. You can then answer questions by saying e.g. "option A" or the answer text. Say <strong>previous</strong> to go back, or <strong>submit</strong> to finish.</p>`;
+}
+
+
+// 🚀 Face verification first, then wait for "start"
+// 🚀 Wait-for-"start" loop with single face verification
+async function startWakeLoop() {
+  try {
+    // 1) Only run face verification if not already verified
+    if (!faceVerified) {
+      const verified = await verifyFace();
+
+      if (!verified) {
+        // Face failed – try again after a short delay
+        setTimeout(startWakeLoop, 1500);
+        return;
+      }
+      // If we’re here, faceVerified has been set to true inside verifyFace()
+    }
+
+    // 2) Face is verified – now just listen for "start"
+    const found = await attemptWake();
+    if (found) {
+      showPopup("Starting exam...");
+      setTimeout(() => {
+        hidePopup();
+        beginExam();
+      }, 700);
+    } else {
+      // Didn’t hear "start" yet – listen again WITHOUT re-running verifyFace
+      setTimeout(startWakeLoop, 800);
+    }
+
+  } catch (err) {
+    console.error("Wake loop error:", err);
+    // On any unexpected error, retry whole loop
+    setTimeout(startWakeLoop, 1500);
+  }
+}
+
+
+
+function attemptWake() {
+  return new Promise((resolve, reject) => {
+    startRecordingSnippet(3000)
+      .then(text => {
+        if (!text) return resolve(false);
+        const t = text.toLowerCase();
+        if (/\bstart\b/.test(t) || /\bbegin\b/.test(t) || /\bgo\b/.test(t)) return resolve(true);
+        resolve(false);
+      })
+      .catch(err => reject(err));
+  });
+}
+
+/* ====== Begin Exam ====== */
+function beginExam() {
+  isStarted = true;
+  currentSection = 'mcq';
+  currentIndex = 0;
+
+  // 🔹 change top-left text once exam starts
+  const headerTitle = document.getElementById('header-title');
+  if (headerTitle) {
+    headerTitle.textContent = "Accessible Voice Exam";
+  }
+
+  startGlobalTimer();
+  playSound('start');
+  showQuestion();
+}
+
+
+/* ====== Show Question ====== */
+function showQuestion() {
+  isAwaitingNext = false;
+  recordingLocked = false;
+  let q, html = '';
+  let total = (currentSection === 'mcq') ? questions.mcq.length : questions.qa.length;
+  document.getElementById('section-title').textContent = (currentSection==='mcq'?'MCQ':'QA') + ` (${currentIndex+1} of ${total})`;
+
+  if (currentSection === 'mcq') {
+    q = questions.mcq[currentIndex];
+    html += `<div class="question-label">${escapeHtml(q.question)}</div>`;
+    html += `<div class="options">` + 
+      q.options.map(opt => {
+        const letter = opt[0];
+        const checked = (q.answer && q.answer === letter) ? 'checked' : '';
+        return `<label><input type="radio" name="mcq${q.id}" value="${letter}" ${checked} disabled> ${escapeHtml(opt)}</label>`;
+      }).join('') + `</div>`;
+  } else {
+    q = questions.qa[currentIndex];
+    html += `<div class="question-label">${escapeHtml(q.question)}</div>`;
+    html += `<textarea id="qa-answer" readonly>${q.answer || ''}</textarea>`;
+  }
+
+  document.getElementById('question-container').innerHTML = html;
+  setTimeout(() => attemptRecordLoop(), 500);
+}
+
+/* ====== Global Timer ====== */
+function startGlobalTimer(){
+  clearInterval(globalTimer);
+  // call once immediately to update UI
+  updateTimer();
+  // let the interval decrement then update
+  globalTimer = setInterval(()=> {
+    timeLeft--;          // decrement once per second here
+    updateTimer();       // update UI / sounds / submit logic
+  }, 1000);
+}
+
+function updateTimer() {
+  // Play warning sound when exactly 60 seconds remain
+  if (timeLeft === 60) {
+    try { playSound('warning'); } catch(e){ console.warn('warning sound failed', e); }
+  }
+
+  // Time finished
+  if (timeLeft <= 0) {
+    clearInterval(globalTimer);
+    showPopup("⏱ Time’s up! Auto-submitting...");
+    try { playSound('autosubmit'); } catch(e){ console.warn('autosubmit sound failed', e); }
+    setTimeout(() => submitExam(), 1500);
+    return;
+  }
+
+  // Update timer text and progress bar
+  let min = Math.floor(timeLeft / 60),
+      sec = timeLeft % 60;
+  document.getElementById('timer').textContent =
+      `Total Time Left: ${min}:${String(sec).padStart(2,'0')}`;
+
+  const percent = 100 * (totalTime - timeLeft) / totalTime;
+  document.getElementById('progress-bar').style.width = percent + "%";
+}
+
+
+
+/* ====== Recording Loop ====== */
+function attemptRecordLoop() {
+  if (!isStarted || isAwaitingNext || recordingLocked || timeLeft<=0) return;
+  startRecordingSnippet((currentSection==='mcq')?3500:9000)
+    .then(transcript => {
+      if (!transcript || transcript.trim()==='') {
+        if (!isAwaitingNext && timeLeft>3) setTimeout(attemptRecordLoop, 700);
+        return;
+      }
+      handleTranscription(transcript);
+    })
+    .catch(err => {
+      console.error("record loop err:", err);
+      if (!isAwaitingNext && timeLeft>3) setTimeout(attemptRecordLoop, 900);
+    });
+}
+
+/* ====== Recording Helper ====== */
+function startRecordingSnippet(durationMs=3500) {
+  return new Promise((resolve, reject) => {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia)
+      return reject("Mic not available");
+    if (recordingLocked) return resolve('');
+    recordingLocked = true;
+    navigator.mediaDevices.getUserMedia({audio:true}).then(stream=>{
+      const mediaRecorder = new MediaRecorder(stream);
+      let audioChunks = [];
+      mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+      mediaRecorder.onerror = e => { cleanup(); reject(e); };
+      mediaRecorder.onstop = ()=>{
+        cleanup();
+        const audioBlob = new Blob(audioChunks, {type:'audio/wav'});
+        const fd = new FormData();
+        fd.append('audio', audioBlob, 'snippet.wav');
+        fetch('/transcribe', {method:'POST', body:fd})
+          .then(r=>r.json()).then(d=>{
+            resolve((d && d.transcription) ? d.transcription.trim() : '');
+          }).catch(err=>reject(err));
+      };
+      function cleanup(){stream.getTracks().forEach(t=>t.stop());recordingLocked=false;}
+      try{
+        mediaRecorder.start();
+        setTimeout(()=>{ try{mediaRecorder.stop();}catch(e){} }, durationMs);
+      }catch(e){ cleanup(); reject(e); }
+    }).catch(err=>{ recordingLocked=false; reject(err); });
+  });
+}
+
+/* ====== Handle Speech ====== */
+function handleTranscription(raw) {
+  const txt = (raw||'').toLowerCase().trim();
+  console.log("TRANSCRIPT:", txt);
+
+  if (/\b(previous|back)\b/.test(txt)) {
+    showPopup("Going to previous question");
+    setTimeout(()=>{ hidePopup(); goPrevious(); }, 600);
+    return;
+  }
+  if (/\b(submit|finish|done)\b/.test(txt)) {
+    showPopup("Submitting exam...");
+    setTimeout(()=>{ hidePopup(); submitExam(); }, 800);
+    return;
+  }
+
+  if (!isStarted) return;
+
+  if (currentSection === 'mcq') {
+    let selected = '';
+    if (/\b(option\s*a|choice\s*a|answer\s*a|\ba\b|\bthe letter a\b)\b/.test(txt)) selected='A';
+    else if (/\b(option\s*b|choice\s*b|answer\s*b|\bb\b|\bthe letter b\b)\b/.test(txt)) selected='B';
+    else if (/\b(option\s*c|choice\s*c|answer\s*c|\bc\b|\bthe letter c\b)\b/.test(txt)) selected='C';
+    else if (/\b(option\s*d|choice\s*d|answer\s*d|\bd\b|\bthe letter d\b)\b/.test(txt)) selected='D';
+
+    if (!selected) {
+      const opts = questions.mcq[currentIndex].options;
+      for (let i=0;i<opts.length;i++){
+        const optText = opts[i].split('.').slice(1).join('.').trim().toLowerCase();
+        if (txt.includes(optText.slice(0, Math.ceil(optText.length*0.75)))) { 
+          selected = opts[i][0]; break; 
+        }
+      }
+    }
+
+    if (selected) {
+      const q = questions.mcq[currentIndex];
+      q.answer = selected;
+      const radio = document.querySelector(`input[name="mcq${q.id}"][value="${selected}"]`);
+      if (radio) radio.checked = true;
+      saveAnswer({type:'mcq', id:q.id, answer:selected});
+      showPopup("Recorded: " + selected);
+      isAwaitingNext = true;
+      setTimeout(()=>{ hidePopup(); moveToNext(); }, 900);
+    } else {
+      if (timeLeft>4 && !isAwaitingNext) setTimeout(attemptRecordLoop, 800);
+    }
+
+  } else {
+    if (txt.length>1) {
+      const q = questions.qa[currentIndex];
+      q.answer = raw;
+      const box = document.getElementById('qa-answer');
+      if (box) box.value = raw;
+      saveAnswer({type:'qa', id:q.id, answer:raw});
+      showPopup("Answer recorded");
+      isAwaitingNext = true;
+      setTimeout(()=>{ hidePopup(); moveToNext(); }, 1100);
+    } else {
+      if (timeLeft>10 && !isAwaitingNext) setTimeout(attemptRecordLoop, 1000);
+    }
+  }
+}
+
+/* ====== Navigation ====== */
+function moveToNext() {
+  isAwaitingNext = false;
+  hidePopup();
+
+  // Always play beep when moving next
+  playSound('beep');
+
+  // Case 1: Only MCQs exist (no QA section)
+  if (questions.qa.length === 0) {
+    if (currentIndex < questions.mcq.length - 1) {
+      // Move to next MCQ
+      currentIndex++;
+      showQuestion();
+    } else {
+      // ✅ Last question reached — inform user, but keep mic ON
+      showPopup("You’ve answered all questions. Say 'submit' to finish or 'previous' to review.");
+      setTimeout(() => hidePopup(), 3000);
+      // 👇 Allow mic to keep listening for “submit” or “previous”
+      isAwaitingNext = false;
+      recordingLocked = false;
+      setTimeout(attemptRecordLoop, 1000);
+    }
+    return;
+  }
+
+  // Case 2: MCQ + QA both exist
+  if (currentSection === 'mcq') {
+    if (currentIndex < questions.mcq.length - 1) {
+      currentIndex++;
+    } else {
+      // Move from MCQ → QA
+      currentSection = 'qa';
+      currentIndex = 0;
+    }
+  } else {
+    if (currentIndex < questions.qa.length - 1) {
+      currentIndex++;
+    } else {
+      // ✅ Last QA reached — inform user, keep mic ON
+      showPopup("You’ve answered all questions. Say 'submit' to finish or 'previous' to review.");
+      setTimeout(() => hidePopup(), 3000);
+      isAwaitingNext = false;
+      recordingLocked = false;
+      setTimeout(attemptRecordLoop, 1000);
+      return;
+    }
+  }
+
+  showQuestion();
+}
+
+
+
+function goPrevious() {
+  isAwaitingNext = false;
+  hidePopup();
+
+  // Always play beep when moving previous
+  playSound('beep');
+
+  // Case 1: Only MCQs exist
+  if (questions.qa.length === 0) {
+    if (currentIndex > 0) {
+      currentIndex--;
+      showQuestion();
+    } else {
+      showPopup("Already at the first question");
+      setTimeout(hidePopup, 700);
+    }
+    return;
+  }
+
+  // Case 2: MCQ + QA both exist
+  if (currentSection === 'qa' && currentIndex === 0 && questions.mcq.length > 0) {
+    currentSection = 'mcq';
+    currentIndex = Math.max(0, questions.mcq.length - 1);
+  } else if (currentIndex > 0) {
+    currentIndex--;
+  } else {
+    showPopup("Already first question");
+    setTimeout(hidePopup, 700);
+  }
+
+  showQuestion();
+}
+
+
+
+/* ====== Save + Submit ====== */
+function saveAnswer(payload) {
+  fetch('/save_answer', { 
+    method: 'POST', 
+    headers: {'Content-Type':'application/json'}, 
+    body: JSON.stringify(payload) 
+  }).catch(e => console.warn("save failed", e));
+}
+
+function submitExam() {
+  fetch('/submit', { method: 'POST' })
+    .then(r => r.json())
+    .then(() => {
+      playSound('submit'); // 🔊 Play sound on submit
+      showCompletion();
+    })
+    .catch(e => { 
+      console.error("submit failed", e); 
+      showPopup("Submit failed — try again"); 
+      setTimeout(hidePopup, 1000); 
+    });
+}
+
+/* ====== Completion Screen ====== */
+function showCompletion() {
+  document.getElementById('question-container').innerHTML = 
+    "<h3 style='text-align:center;color:var(--primary)'>Exam submitted. Thank you!</h3>";
+  document.getElementById('section-title').textContent = "";
+  document.getElementById('timer').textContent = "";
+  document.getElementById('progress-bar').style.width = "100%";
+  isStarted = false;
+  clearInterval(globalTimer);
+}
+
+
+/* ====== Utility ====== */
+function showPopup(msg){ const p=document.getElementById('popup'); p.textContent=msg; p.style.display='block'; }
+function hidePopup(){ const p=document.getElementById('popup'); p.style.display='none'; }
+function escapeHtml(s){ return String(s).replace(/[&<>"'`]/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','`':'&#96;' }[c])); }
+
+/* ====== Audio Feedback ====== */
+const sounds = {
+  start: new Audio('/static/start.mp3'),
+  beep: new Audio('/static/beep.mp3'),
+  autosubmit: new Audio('/static/autosubmit.mp3'),
+  warning: new Audio('/static/warning.mp3'),
+  submit: new Audio('/static/submit.mp3')
+};
+
+// Helper to safely play a sound
+function playSound(type) {
+  try {
+    if (sounds[type]) {
+      sounds[type].currentTime = 0;
+      sounds[type].play();
+    }
+  } catch (e) {
+    console.warn("Sound play failed:", e);
+  }
+}
+
+
+</script>
+</body>
+</html>

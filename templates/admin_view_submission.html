@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Submission {{ sub.id }}</title>
+  <style>
+    :root{--primary:#2a5298;--bg:#f4f7fa;--card:#fff}
+    body{background:var(--bg);font-family:Segoe UI,Arial,sans-serif;margin:0;}
+    header{
+      background:var(--primary);
+      color:#fff;
+      padding:14px 20px;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      font-weight:600;
+    }
+    header a{color:#fff;text-decoration:none;font-size:0.9rem;}
+    .container{
+      max-width:900px;
+      margin:24px auto;
+      padding:0 16px 32px;
+    }
+    .card{
+      background:var(--card);
+      border-radius:12px;
+      padding:18px 20px;
+      box-shadow:0 6px 24px rgba(0,0,0,0.06);
+      margin-bottom:18px;
+    }
+    h2,h3{margin-top:0;}
+    .q{
+      margin-bottom:10px;
+      font-weight:600;
+    }
+    .ans{
+      margin-bottom:14px;
+      padding:8px 10px;
+      background:#f5f7ff;
+      border-radius:8px;
+      font-size:0.95rem;
+    }
+  </style>
+</head>
+<body>
+<header>
+  <div>Submission {{ sub.id }}</div>
+  <a href="{{ url_for('admin_submissions') }}">← Back to Submissions</a>
+</header>
+
+<div class="container">
+  <div class="card">
+    <h2>Student:</h2>
+    <p>
+      {{ sub.student.name if sub.student else "Unknown" }}
+      ({{ sub.student.reg_no if sub.student else "-" }})<br>
+      Submitted at: {{ sub.timestamp }}
+    </p>
+  </div>
+
+  <div class="card">
+    <h3>MCQ Answers</h3>
+    {% for item in mcq %}
+      <div class="q">{{ loop.index }}. {{ item.question }}</div>
+      <div class="ans">Selected: {{ item.answer or "—" }}</div>
+    {% endfor %}
+  </div>
+
+  <div class="card">
+    <h3>Descriptive Answers</h3>
+    {% for item in qa %}
+      <div class="q">{{ loop.index }}. {{ item.question }}</div>
+      <div class="ans">{{ item.answer or "—" }}</div>
+    {% endfor %}
+  </div>
+</div>
+</body>
+</html>
