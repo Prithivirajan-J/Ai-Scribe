@@ -101,7 +101,7 @@ pip install -r requirements.txt
 
 ### 4. Run the application
 
-python upgrade2.py
+python upgrade3.py
 
 ---
 
